@@ -1,0 +1,248 @@
+import tkinter as tk
+from tkinter import filedialog, Text
+import mysql.connector
+import os
+import face_recognition
+import cv2
+import numpy as np
+
+
+root = tk.Tk()
+
+def data():
+    db = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        passwd="",
+        database="facer"
+    )
+    
+    print("Masukkan data untuk gambar yang akan ditambahkan")
+    nama = input('Nama yang akan diberikan ke gambar: ')
+    print("")
+    lokasi = input('Lokasi gambar di perangkat beserta nama filenya: ')
+    print("")
+    deskripsi = input('keterangan tentang siapa yang ada didalam gambar: ')
+    print("")
+    
+    cursor = db.cursor()
+    sql = "INSERT INTO person2 (nm_gbr, lks_gbr, deskripsi) VALUES (%s, %s, %s)"
+    values = (nama, lokasi, deskripsi),
+    for val in values:
+        cursor.execute(sql, val)
+        db.commit()
+        
+        print("{} data ditambahkan".format(len(values)))
+        
+def delete():
+    db = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        passwd="",
+        database="facer"
+    )
+    
+    print("masukkan id untuk gambar yang akan dihapus")
+    id_gambar = input('id gambar yang akan dihapus :')
+    
+    cursor = db.cursor()
+    sql = "DELETE FROM person2 WHERE id_gbr=%s"
+    val = (id_gambar, )
+    cursor.execute(sql, val)
+    
+    db.commit()
+    
+    print("{} data dihapus".format(cursor.rowcount))
+    
+def show():
+    db = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        passwd="",
+        database="facer"
+    )
+    
+    cursor = db.cursor()
+    sql = "SELECT * FROM person2"
+    cursor.execute(sql)
+    
+    results = cursor.fetchall()
+    
+    for data in results:
+        print(data)
+        
+def edit():
+    db = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        passwd="",
+        database="facer"
+    )
+    
+    print("masukkan id gambar yang akan diubah")
+    id_gambar = input('id gambar yang akan diubah :')
+    print("")
+    print("masukkan data gambar yang akan diubah")
+    nama = input('Nama baru yang akan digunakan untuk gambar: ')
+    print("")
+    lokasi_gambar = input('Lokasi baru yang akan digunakan untuk gambar :')
+    print("")
+    deskripsi_gambar = input('Deskripsi baru yang akan digunakan untuk gambar :')
+    
+    cursor = db.cursor()
+    sql = "UPDATE person2 SET nm_gbr=%s, lks_gbr=%s, deskripsi=%s WHERE id_gbr=%s"
+    val = (nama, lokasi_gambar, deskripsi_gambar, id_gambar)
+    cursor.execute(sql, val)
+    
+    db.commit()
+    
+    print("{} data diubah".format(cursor.rowcount))
+    
+def scan():
+    
+    db = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        passwd="",
+        database="facer"
+    )
+    
+    cursor = db.cursor()
+    sql = "SELECT * FROM person2"
+    cursor.execute(sql)
+    
+    result = cursor.fetchmany(4)
+    
+    a=(repr(result))
+    
+    a=a.split()
+    
+    nama1=a[2]
+    
+    lokasi1=a[5]
+    
+    keterangan1=a[8]
+    
+    nama2=a[12]
+    
+    lokasi2=a[15]
+    
+    keterangan2=a[18]
+    
+    nama3=a[22]
+    
+    lokasi3=a[25]
+    
+    keterangan3=a[28]
+    
+    nama4=a[32]
+    
+    lokasi4=a[35]
+    
+    keterangan4=a[38]
+    
+    video_capture = cv2.VideoCapture(0)
+    
+    Wijayanto_image = face_recognition.load_image_file(lokasi4)
+    Wijayanto_face_encoding = face_recognition.face_encodings(Wijayanto_image)[0]
+    
+    Ibu_image = face_recognition.load_image_file(lokasi3)
+    Ibu_face_encoding = face_recognition.face_encodings(Ibu_image)[0]
+    
+    Mbah_image = face_recognition.load_image_file(lokasi2)
+    Mbah_face_encoding = face_recognition.face_encodings(Mbah_image)[0]
+    
+    Ayu_image = face_recognition.load_image_file(lokasi1)
+    Ayu_face_encoding = face_recognition.face_encodings(Ayu_image)[0]
+    
+    known_face_encodings = (
+        Wijayanto_face_encoding,
+        Ibu_face_encoding,
+        Mbah_face_encoding,
+        Ayu_face_encoding
+    )
+    
+    known_face_names = (
+        nama4+keterangan4,
+        nama3+keterangan3,
+        nama2+keterangan2,
+        nama1+keterangan1
+    )
+    
+    face_locations = []
+    face_encodings = []
+    face_names = []
+    process_this_frame = True
+    
+    while True:
+        ret, frame = video_capture.read()
+        
+        small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
+        
+        rgb_small_frame = small_frame[:, :, ::-1]
+        
+        if process_this_frame:
+            face_locations = face_recognition.face_locations(rgb_small_frame)
+            face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)
+            
+            face_names = []
+            for face_encoding in face_encodings:
+                matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
+                name = "Unknown"
+                
+                face_distances = face_recognition.face_distance(known_face_encodings, face_encoding)
+                best_match_index = np.argmin(face_distances)
+                if matches[best_match_index]:
+                    name = known_face_names[best_match_index]
+                    
+                face_names.append(name)
+                
+        process_this_frame = not process_this_frame
+        
+        for (top, right, bottom, left), name in zip(face_locations, face_names):
+            top *= 4
+            right *= 4
+            bottom *= 4
+            left *= 4
+            
+            cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
+            cv2.rectangle(frame, (left, bottom - 35), (right, bottom), (0, 0, 255), cv2.FILLED)
+            font = cv2.FONT_HERSHEY_DUPLEX
+            cv2.putText(frame, name, (left + 6, bottom - 6), font, 0.6, (255, 255, 255), 1)
+            
+        cv2.imshow('Video', frame)
+        
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+            
+    video_capture.release()
+    cv2.destroyAllWindows()
+    
+        
+#canvas = tk.Canvas(root, height=200, width=200, bg="#263D42")
+#canvas.pack()
+
+#frame = tk.Frame(root, bg="white")
+#frame.place(relwidth=1, relheight=1, relx=0, rely=0)
+
+AddData = tk.Button(root, text="Add Data", padx=50,
+                   pady=25, fg="white", bg="#263D42", command=data)
+AddData.pack()
+
+DeleteData = tk.Button(root, text="Delete Data", padx=50,
+                   pady=25, fg="white", bg="#263D42", command=delete)
+DeleteData.pack()
+
+EditData = tk.Button(root, text="Edit Data", padx=50,
+                   pady=25, fg="white", bg="#263D42", command=edit)
+EditData.pack()
+
+ShowData = tk.Button(root, text="Show Data", padx=50,
+                   pady=25, fg="white", bg="#263D42", command=show)
+ShowData.pack()
+
+ScanFaces = tk.Button(root, text="Scan Faces", padx=50,
+                   pady=25, fg="white", bg="#263D42", command=scan)
+ScanFaces.pack()
+
+root.mainloop()
